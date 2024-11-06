@@ -50,6 +50,7 @@ class ImageViewer(QTW.QWidget):
             self.dim_button_grp.addButton(self.dim_buttons[dim_i], dim_i)
             controls.addWidget(self.dim_buttons[dim_i])
             self.selected.append(QTW.QSpinBox())
+            self.selected[dim_i].setSpecialValueText(":")
             controls.addWidget(self.selected[dim_i])
             self.selected[dim_i].valueChanged.connect(self.update_image)
 
@@ -57,6 +58,7 @@ class ImageViewer(QTW.QWidget):
         self.dim_buttons[0].setChecked(True)
         for dim_i in range(self.ndim):
             self.selected[dim_i].setMaximum(self.data.shape[dim_i]-1)
+            self.selected[dim_i].setMinimum(-1)
 
         # TODO: We can disable widgets for singleton dimensions
         # TODO: Add buttons for flipping and rotating the image
@@ -313,6 +315,7 @@ class ImageViewer(QTW.QWidget):
         for dim_i in range(self.ndim):
             if dim_i == self.selected_dims[0] or dim_i == self.selected_dims[1]:
                 self.current_indices[dim_i] = slice(0,self.data.shape[dim_i])
+                self.selected[dim_i].setValue(-1)
             else:
                 self.current_indices[dim_i] = slice(self.selected[dim_i].value(), self.selected[dim_i].value()+1)
     
