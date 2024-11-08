@@ -11,12 +11,14 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from functools import cache
 import numpy.typing as npt
+from .DimensionSelector import DimensionSelector
+from PySide6.QtCore import Slot
 
 class ImageViewer(QTW.QWidget):
 
     timer_interval = 100 # [ms]
-    current_indices = []
     selected_dims = [0, 1, 2] # Triplet of dimensions 0: y axis, 1: x axis, 2: dynamic axis
+    dim_selector = None
     def __init__(self, array: npt.ArrayLike, parent=None):
         """
         Stores off container for later use; sets up the main panel display
@@ -28,7 +30,6 @@ class ImageViewer(QTW.QWidget):
         logging.info("Image constructor.")
         self.data = array
         self.ndim = array.ndim
-        self.current_indices = [slice(0,1) for _ in range(self.ndim)]
 
         # Main layout
         layout = QTW.QVBoxLayout(self)
@@ -40,25 +41,9 @@ class ImageViewer(QTW.QWidget):
         controls.setContentsMargins(0,0,0,0)
 
         # Create a drop-down for the image instance
-        self.dim_buttons = []
-        self.selected = []
-        self.dim_button_grp = QTW.QButtonGroup()
-        self.dim_button_grp.setExclusive(True)
-        for dim_i in range(self.ndim):
-            self.dim_buttons.append(QTW.QPushButton(text=f'{self.data.shape[dim_i]}'))
-            self.dim_buttons[dim_i].setCheckable(True)
-            self.dim_button_grp.addButton(self.dim_buttons[dim_i], dim_i)
-            controls.addWidget(self.dim_buttons[dim_i])
-            self.selected.append(QTW.QSpinBox())
-            self.selected[dim_i].setSpecialValueText(":")
-            controls.addWidget(self.selected[dim_i])
-            self.selected[dim_i].valueChanged.connect(self.update_image)
-
-        self.update_indices()
-        self.dim_buttons[0].setChecked(True)
-        for dim_i in range(self.ndim):
-            self.selected[dim_i].setMaximum(self.data.shape[dim_i]-1)
-            self.selected[dim_i].setMinimum(-1)
+        self.dim_selector = DimensionSelector(self.data.shape)
+        self.dim_selector.indicesUpdatedSignal.connect(self.update_image)
+        controls.addWidget(self.dim_selector)
 
         # TODO: We can disable widgets for singleton dimensions
         # TODO: Add buttons for flipping and rotating the image
@@ -77,8 +62,6 @@ class ImageViewer(QTW.QWidget):
         controls.addStretch()
 
         self.animate.clicked.connect(self.animate_frames)
-        # self.animDim.currentIndexChanged.connect(self.check_dim)
-        self.dim_button_grp.buttonClicked.connect(self.check_dim)
 
         # Window/level controls; Add a widget with a horizontal layout
         # NOTE: we re-use the local names from above...
@@ -241,8 +224,8 @@ class ImageViewer(QTW.QWidget):
 
     def wheelEvent(self, event):
         "Handle scroll event; could use some time-based limiting."
-        dim_i = self.dim_button_grp.checkedId()
-        control = self.selected[dim_i]
+        dim_i = self.dim_selector.dynamic_dimension()
+        control = self.dim_selector.dim_spinboxes[dim_i]
 
         num_pixels = event.pixelDelta()
         num_degrees = event.angleDelta() / 8
@@ -258,8 +241,7 @@ class ImageViewer(QTW.QWidget):
             new_v = control.value() + 1
         else:
             return
-        control.setValue(max(min(new_v,self.image_shape()[self.dim_button_grp.checkedId()]-1),0))
-        # control.setValue(max(min(new_v,self.stack.shape[self.dim_button_grp.checkedId()]-1),0))
+        control.setValue(max(min(new_v,self.image_shape()[dim_i]-1),0))
 
     def contextMenuEvent(self, event):
     
@@ -309,26 +291,22 @@ class ImageViewer(QTW.QWidget):
         # return None
 
     def current_frame(self):
-        return self.data[tuple(self.current_indices)].squeeze()
+        return self.data[self.dim_selector.get_current_slices()].squeeze()
     
-    def update_indices(self):
-        for dim_i in range(self.ndim):
-            if dim_i == self.selected_dims[0] or dim_i == self.selected_dims[1]:
-                self.current_indices[dim_i] = slice(0,self.data.shape[dim_i])
-                self.selected[dim_i].setValue(-1)
-            else:
-                self.current_indices[dim_i] = slice(self.selected[dim_i].value(), self.selected[dim_i].value()+1)
-    
+
+    @Slot()
     def update_image(self):
         """
         Updates the displayed image when a set of indicies (frame/coil/slice)
         is selected. Connected to singals from the related spinboxes.
         """
-        self.update_indices()
+        print('Updating image')
+        print(self.dim_selector.get_current_slices())
+        cframe = self.current_frame()
         wl = self.window_level()
         self.ax.clear()
         self.image = \
-            self.ax.imshow(self.current_frame(), 
+            self.ax.imshow(cframe, 
                             vmin=wl[0],
                             vmax=wl[1],
                             cmap=plt.get_cmap('gray'))
@@ -364,21 +342,21 @@ class ImageViewer(QTW.QWidget):
             self.animate.setIcon(icon)
             return
         
-        dim_i = self.dim_button_grp.checkedId()
+        dim_i = self.dim_selector.dynamic_dimension()
 
         pixmapi = QTW.QStyle.StandardPixmap.SP_MediaPause
         icon = self.style().standardIcon(pixmapi)
         self.animate.setIcon(icon)
 
-        if self.selected[dim_i].maximum() == 0:
+        if self.dim_selector.dim_spinboxes[dim_i].maximum() == 0:
             logging.warning("Cannot animate singleton dimension.")
             self.animate.setChecked(False)
             return
 
         def increment():
-            v = self.selected[dim_i].value()
-            m = self.selected[dim_i].maximum()
-            self.selected[dim_i].setValue((v+1) % m)
+            v = self.dim_selector.dim_spinboxes[dim_i].value()
+            m = self.dim_selector.dim_spinboxes[dim_i].maximum()
+            self.dim_selector.dim_spinboxes[dim_i].setValue((v+1) % m)
 
         self.timer = QtCore.QTimer(self)
         self.timer.setInterval(self.timer_interval)
