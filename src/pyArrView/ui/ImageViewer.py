@@ -301,7 +301,11 @@ class ImageViewer(QTW.QWidget):
         is selected. Connected to singals from the related spinboxes.
         """
         print('Updating image')
-        print(self.dim_selector.get_current_slices())
+        # TODO: Add support for complex images.
+        # TODO: Add support for third dimension with montage.
+        # TODO: Add support for image modifiers (transpose, flip, rotate, fft, etc.)
+        # TODO: Add support for 1D plots.
+        # TODO: Add support for ROI selection.
         cframe = self.current_frame()
         wl = self.window_level()
         self.ax.clear()
@@ -310,10 +314,6 @@ class ImageViewer(QTW.QWidget):
                             vmin=wl[0],
                             vmax=wl[1],
                             cmap=plt.get_cmap('gray'))
-            # self.ax.imshow(self.stack[self.frame()][self.repetition()][self.set()][self.phase()][self.coil()][self.slice()], 
-            #                vmin=wl[0],
-            #                vmax=wl[1],
-            #                cmap=plt.get_cmap('gray'))
 
         self.ax.set_xticks([])
         self.ax.set_yticks([])

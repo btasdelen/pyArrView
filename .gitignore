@@ -3,3 +3,4 @@ testenv/
 *.egg-info
 __pycache__/
 build/
+.vscode/
