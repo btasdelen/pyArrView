@@ -102,6 +102,7 @@ class DimButton(QPushButton):
     def __init__(self, text, dim_id: int, parent=None):
         super().__init__(text, parent)
         self.setCheckable(False)
+        self.setMaximumWidth(50)
         self.set_role(-1)
         self.setContextMenuPolicy(Qt.PreventContextMenu)
         self.dim_id = dim_id
@@ -132,6 +133,7 @@ class DimSpinBox(QSpinBox):
     def __init__(self, dim_id: int, parent=None):
         super().__init__(parent)
         self.dim_id = dim_id
+        self.setMaximumWidth(50)
         self.setContextMenuPolicy(Qt.PreventContextMenu)
         self.valueChanged.connect(self.update_idx_selection)
 
