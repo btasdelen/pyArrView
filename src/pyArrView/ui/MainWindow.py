@@ -5,41 +5,47 @@ from PySide6 import QtWidgets
 from PySide6.QtCore import Signal, Slot
 
 from .ImageViewer import ImageViewer
+from matplotlib import colormaps
 
 
 class MainWindow(QtWidgets.QMainWindow):
 
-    open = Signal(str)
+    change_cmap = Signal(str)
 
     def __init__(self, array):
         super().__init__()
 
         self.setUnifiedTitleAndToolBarOnMac(True)
 
-        self.fileMenu = super().menuBar().addMenu("&File")
-        self.fileMenu.addAction("&Open", self.open_file_dialog)
+        self.view_menu = super().menuBar().addMenu("&View")
+        self.cmap_menu = self.view_menu.addMenu("&Colormap")
+        self.populate_cmap_menu()
 
-        self.open.connect(self.open_file)
+        self.help_menu = super().menuBar().addMenu("&Help")
+        self.help_menu.addAction("&Usage", self.usage_dialog)
+        self.help_menu.addAction("&Shortcuts", self.shortcuts_dialog)
+        self.help_menu.addAction("&About", self.about_dialog)
+        
         self.setCentralWidget(ImageViewer(parent=self, array=array))
 
+    def usage_dialog(self):
+        QtWidgets.QMessageBox.information(self, "Usage", "Usage")
+
+    def shortcuts_dialog(self):
+        QtWidgets.QMessageBox.information(self, "Shortcuts", "Shortcuts")
+    
+    def about_dialog(self):
+        QtWidgets.QMessageBox.information(self, "About", "About")
+
+    def populate_cmap_menu(self):
+        cmap_list = list(colormaps)
+
+        for cmap in cmap_list:
+            action = self.cmap_menu.addAction(cmap)
+            action.triggered.connect(self.cmap_change_requested)
 
     @Slot()
-    def open_file_dialog(self):
-
-        file_name, file_type = QtWidgets.QFileDialog.getOpenFileName(
-            self,
-            "Open ISMRMRD Data File",
-            os.getcwd(),
-            "Numpy arrays (*.npy *.npz);;Matlab files (*.mat);;All Files (*)"
-        )
-
-        if not file_name:
-            return
-
-        self.open.emit(file_name)
-
-    def open_file(self, file_name):
-        logging.info(f"Opening file: {file_name}")
-        self.setWindowFilePath(file_name)
-
-
+    def cmap_change_requested(self):
+        action = self.sender()
+        cmap = action.text()
+        self.change_cmap.emit(cmap)

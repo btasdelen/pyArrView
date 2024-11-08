@@ -1,25 +1,28 @@
 import logging
+from typing import Literal
 import numpy as np
 import scipy.io as spio
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('QtAgg')
 
-from PySide6 import QtCore, QtGui, QtWidgets as QTW
+from PySide6 import QtCore, QtWidgets as QTW
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from functools import cache
 import numpy.typing as npt
 from .DimensionSelector import DimensionSelector
 from PySide6.QtCore import Slot
+from PySide6.QtWidgets import QMainWindow
 
 class ImageViewer(QTW.QWidget):
 
     timer_interval = 100 # [ms]
-    selected_dims = [0, 1, 2] # Triplet of dimensions 0: y axis, 1: x axis, 2: dynamic axis
     dim_selector = None
-    def __init__(self, array: npt.ArrayLike, parent=None):
+    view_type: Literal['Magnitude', 'Real', 'Imag', 'Phase', 'Complex'] = 'Magnitude'
+    cmap = 'gray'
+
+    def __init__(self, array: npt.ArrayLike, parent: QMainWindow):
         """
         Stores off container for later use; sets up the main panel display
         canvas for plotting into with matplotlib. Also prepares the interface
@@ -30,6 +33,12 @@ class ImageViewer(QTW.QWidget):
         logging.info("Image constructor.")
         self.data = array
         self.ndim = array.ndim
+
+        parent.change_cmap.connect(self.change_cmap)
+
+        # TODO: Add support for complex images.
+        if np.iscomplexobj(array):
+            self.data = np.abs(array)
 
         # Main layout
         layout = QTW.QVBoxLayout(self)
@@ -293,6 +302,10 @@ class ImageViewer(QTW.QWidget):
     def current_frame(self):
         return self.data[self.dim_selector.get_current_slices()].squeeze()
     
+    @Slot(str)
+    def change_cmap(self, cmap):
+        self.cmap = cmap
+        self.update_image()
 
     @Slot()
     def update_image(self):
@@ -306,6 +319,7 @@ class ImageViewer(QTW.QWidget):
         # TODO: Add support for image modifiers (transpose, flip, rotate, fft, etc.)
         # TODO: Add support for 1D plots.
         # TODO: Add support for ROI selection.
+        # TODO: Add magnitude/real/imaginary/phase selection.
         cframe = self.current_frame()
         wl = self.window_level()
         self.ax.clear()
@@ -313,7 +327,7 @@ class ImageViewer(QTW.QWidget):
             self.ax.imshow(cframe, 
                             vmin=wl[0],
                             vmax=wl[1],
-                            cmap=plt.get_cmap('gray'))
+                            cmap=self.cmap)
 
         self.ax.set_xticks([])
         self.ax.set_yticks([])
