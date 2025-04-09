@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyArrView"
-version = "0.1.0"
+version = "0.2.0"
 authors = [{ name = "Bilal Tasdelen", email = "billtasdelen@gmail.com"}]
 maintainers = [
   { name = "Bilal Tasdelen" },

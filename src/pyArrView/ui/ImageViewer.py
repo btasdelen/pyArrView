@@ -11,10 +11,12 @@ from PySide6 import QtCore, QtWidgets as QTW
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 # from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
+from matplotlib import animation
 import numpy.typing as npt
 from .DimensionSelector import DimensionSelector
 from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QMainWindow
+from PySide6.QtGui import QIcon
 from .utils import complex2rgb
 
 class ImageViewer(QTW.QWidget):
@@ -25,6 +27,8 @@ class ImageViewer(QTW.QWidget):
     cmap = 'gray'
 
     do_transpose = False
+    do_vflip = False
+    do_hflip = False
     nrot = 0
 
     wdw = 1.0
@@ -42,7 +46,9 @@ class ImageViewer(QTW.QWidget):
         self.data = array
         self.ndim = array.ndim
 
+        # Connect parent signals
         parent.change_cmap.connect(self.change_cmap)
+        parent.save_video.connect(self.save_movie)
 
         # Main layout
         layout = QTW.QVBoxLayout(self)
@@ -59,7 +65,6 @@ class ImageViewer(QTW.QWidget):
         controls.addWidget(self.dim_selector)
 
         # TODO: We can disable widgets for singleton dimensions
-        # TODO: Add buttons for flipping and rotating the image
 
         self.animate = QTW.QPushButton()
         self.animate.setCheckable(True)
@@ -140,16 +145,37 @@ class ImageViewer(QTW.QWidget):
         controls.addWidget(self.viewmode_box)
 
         # Add quick operations
+        # TODO: What if we don't have these icons on the system? Need local fallback icons. Maybe from arrShow project?
+        icon_rot_ccw = QIcon.fromTheme("object-rotate-left")
+        icon_rot_cw = QIcon.fromTheme("object-rotate-right")
+        icon_flip_h = QIcon.fromTheme("object-flip-horizontal")
+        icon_flip_v = QIcon.fromTheme("object-flip-vertical")
+
         self.transpose_btn = QTW.QPushButton(".T")
         self.transpose_btn.setCheckable(True)
         self.transpose_btn.clicked.connect(self.update_image)
         self.transpose_btn.setToolTip("Transpose")
         controls.addWidget(self.transpose_btn)
-        self.rot_cw_btn = QTW.QPushButton("CW")
+        self.fliph_btn = QTW.QPushButton()
+        self.fliph_btn.setIcon(icon_flip_h)
+        self.fliph_btn.setCheckable(True)
+        self.fliph_btn.clicked.connect(self.update_image)
+        self.fliph_btn.setToolTip("Flip Horizontally")
+        controls.addWidget(self.fliph_btn)
+        self.flipv_btn = QTW.QPushButton()
+        self.flipv_btn.setIcon(icon_flip_v)
+        self.flipv_btn.setCheckable(True)
+        self.flipv_btn.clicked.connect(self.update_image)
+        self.flipv_btn.setToolTip("Flip Vertically")
+        controls.addWidget(self.flipv_btn)
+
+        self.rot_cw_btn = QTW.QPushButton()
+        self.rot_cw_btn.setIcon(icon_rot_cw)
         self.rot_cw_btn.clicked.connect(self.rot_img_cw)
         self.rot_cw_btn.setToolTip("Rotate Clockwise")
         controls.addWidget(self.rot_cw_btn)
-        self.rot_ccw_btn = QTW.QPushButton("CCW")
+        self.rot_ccw_btn = QTW.QPushButton()
+        self.rot_ccw_btn.setIcon(icon_rot_ccw)
         self.rot_ccw_btn.clicked.connect(self.rot_img_ccw)
         self.rot_ccw_btn.setToolTip("Rotate Counter-Clockwise")
         controls.addWidget(self.rot_ccw_btn)
@@ -183,10 +209,10 @@ class ImageViewer(QTW.QWidget):
         self.animate.setEnabled(bool(self.image_shape()[checkedId] > 1))
 
     def rot_img_cw(self):
-        self.nrot += 1
+        self.nrot -= 1
         self.update_image()
     def rot_img_ccw(self):
-        self.nrot -= 1
+        self.nrot += 1
         self.update_image()
 
     
@@ -299,9 +325,9 @@ class ImageViewer(QTW.QWidget):
                     extent = self.ax.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
                     self.fig.savefig(savefilepath[0], bbox_inches=extent)
                 elif sel_filter == "MAT file (*.mat)":
-                    spio.savemat(savefilepath[0], {'data': self.fetch_image(self.repetition(), self.set(), self.phase(), self.slice(), self.contrast())[self.frame()][self.coil()][0]})
+                    spio.savemat(savefilepath[0], {'data': self.current_frame()})
                 elif sel_filter == "NPY file (*.npy)":
-                    np.save(savefilepath[0], self.fetch_image(self.repetition(), self.set(), self.phase(), self.slice(), self.contrast())[self.frame()][self.coil()][0])
+                    np.save(savefilepath[0], self.current_frame())
                     
 
         elif action == plotFrameAction:
@@ -341,9 +367,15 @@ class ImageViewer(QTW.QWidget):
     def current_frame(self):
         return self.data[self.dim_selector.get_current_slices()].squeeze()
     
-    def prep_image_to_display(self):
+    def prep_image_to_display(self, cimg=None):
+        """
+        Prepares the image to be displayed by applying the selected view type
+        and any transformations (transpose, flip, rotate).
+        """
+        if cimg is None:
+            cimg = self.current_frame()
+        
         view_type = self.viewmode_box.currentText()
-        cimg = self.current_frame()
         if view_type == 'Magnitude':
             cimg = np.abs(cimg)
         elif view_type == 'Real':
@@ -357,8 +389,12 @@ class ImageViewer(QTW.QWidget):
     
         if self.transpose_btn.isChecked():
             cimg = cimg.T
-
-        cimg = np.rot90(cimg, self.nrot, axes=(0,1))
+        if self.flipv_btn.isChecked():
+            cimg = np.flipud(cimg)
+        if self.fliph_btn.isChecked():
+            cimg = np.fliplr(cimg)
+        if self.nrot != 0:
+            cimg = np.rot90(cimg, self.nrot, axes=(0,1))
 
         return cimg
     
@@ -434,3 +470,51 @@ class ImageViewer(QTW.QWidget):
         self.timer.timeout.connect(increment)
         self.timer.start()
 
+    @Slot()
+    def save_movie(self):
+        dim_i = self.dim_selector.dynamic_dimension()
+        framerate = self.frameRate.value()
+
+        # Open a save file dialog to ask for the filename
+        options = QTW.QFileDialog.Options()
+        options |= QTW.QFileDialog.DontUseNativeDialog
+        movie_filename, _ = QTW.QFileDialog.getSaveFileName(
+            self,
+            "Save Movie As...",
+            f"movie_{dim_i}_{framerate}fps.mp4",
+            "MP4 Files (*.mp4);;All Files (*)",
+            options=options
+        )
+
+        if not movie_filename:
+            logging.info("Save movie operation canceled.")
+            return
+
+        logging.info(f"Saving the movie from dim {dim_i} with frame rate {framerate} fps as the filename {movie_filename}")
+
+        fig = plt.figure(frameon=False)
+        w,h = self.current_frame().shape[0:2]
+        dpi = 96
+        w /= dpi
+        h /= dpi
+        fig.set_dpi(dpi)
+        fig.set_size_inches(w,h)
+        ax = plt.Axes(fig, [0., 0., 1., 1.])
+        ax.set_axis_off()
+        fig.add_axes(ax)
+        im_ax = []
+
+        n_frames = self.dim_selector.dim_spinboxes[dim_i].maximum()
+        self.data[self.dim_selector.get_current_slices()].squeeze()
+        slcs = self.dim_selector.get_current_slices()
+        for ii in range(n_frames):
+            slcs_ = (*slcs[:dim_i], slice(ii, ii+1), *slcs[dim_i+1:])
+            im_ = self.data[slcs_].squeeze()
+            im_ = self.prep_image_to_display(im_)
+            ima_ = ax.imshow(im_, cmap='gray', animated=True, vmin=self.window_level()[0], vmax=self.window_level()[1], aspect='equal')
+            im_ax.append([ima_])
+
+        ani = animation.ArtistAnimation(fig, im_ax, interval=1e3/framerate, blit=True)
+        MWriter = animation.FFMpegWriter(fps=framerate)
+        ani.save(movie_filename, writer=MWriter)
+        logging.info(f"Movie saved as {movie_filename}")
