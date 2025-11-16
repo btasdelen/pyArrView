@@ -4,15 +4,19 @@ from PySide6.QtCore import Qt, Signal, Slot, QSignalBlocker
 # Controls the dimension selection using buttons
 # Controls the selected indices for each dimension using QSpinBox
 class DimensionSelector(QWidget):
-    dim_buttons = []
-    button_group = QButtonGroup()
-    selected_dimensions = [] # 0: row, 1: column, 2: dynamic
-    dim_spinboxes = []
-    current_indices = []
     indicesUpdatedSignal = Signal()
-    layout = QHBoxLayout()
+    
     def __init__(self, shape, parent=None):
         super().__init__(parent)
+        
+        # Initialize instance variables (not class variables!)
+        self.dim_buttons = []
+        self.button_group = QButtonGroup()
+        self.selected_dimensions = []  # 0: row, 1: column, 2: dynamic
+        self.dim_spinboxes = []
+        self.current_indices = []
+        self.layout = QHBoxLayout()
+        
         self.ndims = len(shape)
         self.shape = shape
         self.current_indices = [slice(0, 1) for _ in range(self.ndims)]

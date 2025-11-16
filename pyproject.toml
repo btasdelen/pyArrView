@@ -23,3 +23,6 @@ dependencies = [
   "scipy",
   "PySide6",
 ]
+
+[tool.setuptools.package-data]
+ismrmrdviewer = ["resources/icons/*.png", "resources/icons/*.svg"]

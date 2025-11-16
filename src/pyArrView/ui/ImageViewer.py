@@ -18,6 +18,7 @@ from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QMainWindow
 from PySide6.QtGui import QIcon
 from .utils import complex2rgb
+from importlib.resources import files
 
 class ImageViewer(QTW.QWidget):
 
@@ -146,11 +147,24 @@ class ImageViewer(QTW.QWidget):
 
         # Add quick operations
         # TODO: What if we don't have these icons on the system? Need local fallback icons. Maybe from arrShow project?
-        icon_rot_ccw = QIcon.fromTheme("object-rotate-left")
-        icon_rot_cw = QIcon.fromTheme("object-rotate-right")
-        icon_flip_h = QIcon.fromTheme("object-flip-horizontal")
-        icon_flip_v = QIcon.fromTheme("object-flip-vertical")
+        icon_path = files('pyArrView').joinpath('resources/icons')
+        icon_rot_ccw = QIcon.fromTheme(QIcon.ThemeIcon.ObjectRotateLeft, QIcon(str(icon_path.joinpath('rotate-cw.svg'))))
+        icon_rot_cw = QIcon.fromTheme(QIcon.ThemeIcon.ObjectRotateRight, QIcon(str(icon_path.joinpath('rotate-ccw.svg'))))
+        icon_flip_h = QIcon.fromTheme("object-flip-horizontal", QIcon(str(icon_path.joinpath('flip-horizontal.svg'))))
+        icon_flip_v = QIcon.fromTheme("object-flip-vertical", QIcon(str(icon_path.joinpath('flip-vertical.svg'))))
 
+        self.rot_cw_button = QTW.QPushButton()
+        self.rot_cw_button.setIcon(icon_rot_cw)
+        self.rot_cw_button.setToolTip("Rotate clockwise")
+        self.rot_ccw_button = QTW.QPushButton()
+        self.rot_ccw_button.setIcon(icon_rot_ccw)
+        self.rot_ccw_button.setToolTip("Rotate counter-clockwise")
+        self.flip_h_button = QTW.QPushButton()
+        self.flip_h_button.setIcon(icon_flip_h)
+        self.flip_h_button.setToolTip("Flip horizontally")
+        self.flip_v_button = QTW.QPushButton()
+        self.flip_v_button.setIcon(icon_flip_v)
+        self.flip_v_button.setToolTip("Flip vertically")
         self.transpose_btn = QTW.QPushButton(".T")
         self.transpose_btn.setCheckable(True)
         self.transpose_btn.clicked.connect(self.update_image)
