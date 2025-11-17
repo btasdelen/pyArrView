@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyArrView"
-version = "0.3.0"
+version = "0.3.1"
 authors = [{ name = "Bilal Tasdelen", email = "billtasdelen@gmail.com"}]
 maintainers = [
   { name = "Bilal Tasdelen" },
@@ -23,6 +23,10 @@ dependencies = [
   "scipy",
   "PySide6",
 ]
+
+[tool.setuptools]
+packages = ["pyArrView", "pyArrView.ui"]
+package-dir = {"" = "src"}
 
 [tool.setuptools.package-data]
 ismrmrdviewer = ["resources/icons/*.png", "resources/icons/*.svg"]
